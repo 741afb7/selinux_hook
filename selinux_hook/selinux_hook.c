@@ -763,8 +763,12 @@ static bool clean_policydb_redirect_supported(void)
      * through a legacy context_struct_compute_av() signature which has no
      * policydb argument.  Keep the policydb-argument redirect path limited to
      * kernels where arg0 is really a policydb pointer.
+     *
+     * 部分 4.14 内核 BACKPORT 了以下 commit：
+     * https://android.googlesource.com/kernel/common/+/aa8e712cee93d520e96a2ca8e3a20f807c937e3f
+     * selinux_state 和 policydb 参数均是在该 commit 中引入的。
      */
-    return !use_legacy_clean_blob_query();
+    return !use_legacy_clean_blob_query() || g_selinux_state;
 }
 
 static bool current_is_policy_manager(void)
@@ -2205,7 +2209,7 @@ static void before_sel_write_access(hook_fargs4_t *a, void *u)
     // if (current_uid() < 10000 || current_is_policy_manager()) {
     //     return; 
     // }
-    pr_info("[selinux_hook] before_sel_write_access called uid=%u\n", current_uid());
+    // pr_info("[selinux_hook] before_sel_write_access called uid=%u\n", current_uid());
     const char *query = (const char *)a->arg1;
     size_t size = (size_t)a->arg2;
     size_t sample_len;
@@ -3273,6 +3277,8 @@ static long init(const char *args, const char *event, void *__user r)
     }
 
     addr = (unsigned long)kallsyms_lookup_name("selinux_setprocattr");
+    if (!addr)
+        addr = lookup_name_with_suffix("selinux_setprocattr");
     if (addr) {
         g_funcs[g_hooks++] = (void *)addr;
         selinux_hook_dbg("[selinux_hook] hook selinux_setprocattr argc=3\n");
